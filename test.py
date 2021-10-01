@@ -1,21 +1,30 @@
 from os import access
 from re import purge
 import pyupbit
+import datetime
+import configparser
+from six.moves import urllib_parse
 from telegram import message
+
+import time
+
+TEST=True
+
 
 balance_currency_key = "currency"
 balance_balance_key = "balance"
 balance_avg_buy_price_key = "avg_buy_price"
 
-mycurrencies = ['KRW', 'ETH']
+mycurrencies = ['KRW', 'ETH', 'BTC']
+TICKER_KRW = "KRW"
 TICKER_KRW_ETH = "KRW-ETH"
+TICKER_KRW_BTC = "KRW-BTC"
 
 RATIO = 0.5
 init_balance = 2700000
 
 
 def load_config():
-    import configparser
     config = configparser.ConfigParser()
     config.read("/home/yprite/yfun/autoTrader/.config.ini")
     
@@ -57,16 +66,60 @@ def make_info(KRW_KRW, KRW_ETH, sum):
     info = str_status + "\n" + str_spit_line + "\n" + str_krw_status + "\n" + str_eth_status
     return info
 
+def is_take_profit(KRW_KRW, KRW_ETH, sum):
+    if (sum-init_balance)/sum > 0.1:
+        return True
+    else:
+        return False
+    
+def sell_all_eth(upbit):
+    print ("{0}|가격:{1}|수량:{2}".format("ETH", pyupbit.get_current_price(TICKER_KRW_ETH), upbit.get_balance(TICKER_KRW_ETH)))
+    if TEST == False:
+        ret = upbit.sell_limit_order(TICKER_KRW_ETH, float(pyupbit.get_current_price(TICKER_KRW_ETH)), upbit.get_balance(TICKER_KRW_ETH))
+        if 'error' in ret.keys():
+            print ("sell_all_eth|ERROR|{0}".format(ret))
+            return False
+        return True
+
+def buy_btc(upbit):
+    print ("{0}|잔고:{1}".format("KRW", upbit.get_balance(TICKER_KRW)))
+    if TEST == False:
+        ret = upbit.buy_limit_order(TICKER_KRW_BTC, float(pyupbit.get_current_price(TICKER_KRW_BTC)), float(upbit.get_balance(TICKER_KRW)*0.1))
+        if 'error' in ret.keys():
+            print ("buy_btc|ERROR|{0}".format(ret))
+            return False
+    return True
+
+def buy_eth(upbit):
+    print ("{0}|잔고:{1}".format("KRW", upbit.get_balance(TICKER_KRW)))
+    if TEST == False:
+        ret = upbit.buy_limit_order(TICKER_KRW_BTC, float(pyupbit.get_current_price(TICKER_KRW_BTC)), float(upbit.get_balance(TICKER_KRW)*0.1))
+        if 'error' in ret.keys():
+            print ("buy_btc|ERROR|{0}".format(ret))
+            return False
+    return True
+
+def sell_eth(upbit):
+    print ("{0}|잔고:{1}".format("KRW", upbit.get_balance(TICKER_KRW)))
+    if TEST == False:
+        ret = upbit.buy_limit_order(TICKER_KRW_BTC, float(pyupbit.get_current_price(TICKER_KRW_BTC)), float(upbit.get_balance(TICKER_KRW)*0.1))
+        if 'error' in ret.keys():
+            print ("buy_btc|ERROR|{0}".format(ret))
+            return False
+    return True
+
+
 def choice_trade(upbit, KRW_KRW, KRW_ETH, sum):
     str_trader_decision  = ""
     str_error = ""
-    if (0.5 - KRW_ETH/sum)/2 > 1:
+    if (0.5 - KRW_ETH/sum) > 0.01:
         str_trader_decision ="ETH BUY"
-        ret = upbit.buy_limit_order(TICKER_KRW_ETH, float(pyupbit.get_current_price(TICKER_KRW_ETH)), round((0.5 - KRW_KRW/sum)*sum)/ float(pyupbit.get_current_price(TICKER_KRW_ETH)))
+        ret = upbit.buy_limit_order(TICKER_KRW_ETH, float(pyupbit.get_current_price(TICKER_KRW_ETH)), round((0.5 - KRW_ETH/sum)*sum)/ float(pyupbit.get_current_price(TICKER_KRW_ETH)))
         if 'error' in ret.keys():
             print ("ERROR")
+            print (ret)
             str_error = ret['error']['meesage']
-    elif (0.5 - KRW_ETH/sum)/2 < -1:
+    elif (0.5 - KRW_ETH/sum) < -0.01:
         str_trader_decision = "ETH SELL"
         ret = upbit.sell_limit_order(TICKER_KRW_ETH, float(pyupbit.get_current_price(TICKER_KRW_ETH)), round((0.5 - KRW_KRW/sum)*sum)/ float(pyupbit.get_current_price(TICKER_KRW_ETH)))
         if 'error' in ret.keys():
@@ -81,16 +134,21 @@ def choice_trade(upbit, KRW_KRW, KRW_ETH, sum):
         return str_trader_decision + "\n" + "ERROR : " + str_error
 
 def main():
-    import datetime
     
     access_key, secret_key, telegram_token, telegram_id = load_config()
+    
     
     print("\n\n"+str(datetime.datetime.now()))
     upbit = pyupbit.Upbit(access_key, secret_key)
     KRW_KRW, KRW_ETH, sum = get_balance_from_upbit(upbit)
     
-    msg = make_info(KRW_KRW, KRW_ETH, sum)
-
+    before = make_info(KRW_KRW, KRW_ETH, sum)
+    is_take_profit(KRW_KRW, KRW_ETH, sum)
+    decision = choice_trade(upbit, KRW_KRW, KRW_ETH, sum)
+    AFTER_KRW_KRW, AFTER_KRW_ETH, AFTER_SUM = get_balance_from_upbit(upbit)
+    time.sleep(5)
+    after = make_info(AFTER_KRW_KRW, AFTER_KRW_ETH, AFTER_SUM)
+    msg = before+"\n"+"decision"+"\n"+after
     
     print (msg)
     telegram(telegram_token, telegram_id, msg)
@@ -98,4 +156,4 @@ def main():
 
 
 if __name__ == "__main__":
-	main()
+    main()
