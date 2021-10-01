@@ -73,7 +73,8 @@ def is_take_profit(KRW_KRW, KRW_ETH, sum):
         return False
     
 def sell_all_eth(upbit):
-    print ("{0}|가격:{1}|수량:{2}".format("ETH", pyupbit.get_current_price(TICKER_KRW_ETH), upbit.get_balance(TICKER_KRW_ETH)))
+    #TODO:세부 내용 변경 필요 구조만 잡아놓음
+    print ("{0}|가격:{1}|주문 수량:{2}".format("ETH", pyupbit.get_current_price(TICKER_KRW_ETH), upbit.get_balance(TICKER_KRW_ETH)/upbit.get_balance(TICKER_KRW)))
     if TEST == False:
         ret = upbit.sell_limit_order(TICKER_KRW_ETH, float(pyupbit.get_current_price(TICKER_KRW_ETH)), upbit.get_balance(TICKER_KRW_ETH))
         if 'error' in ret.keys():
@@ -82,7 +83,8 @@ def sell_all_eth(upbit):
         return True
 
 def buy_btc(upbit):
-    print ("{0}|잔고:{1}".format("KRW", upbit.get_balance(TICKER_KRW)))
+    #TODO:세부 내용 변경 필요 구조만 잡아놓음
+    print ("{0}|잔고:{1}|주문 수량:{2}".format("KRW", upbit.get_balance(TICKER_KRW), upbit.get_balance(TICKER_KRW_BTC)/upbit.get_balance(TICKER_KRW)))
     if TEST == False:
         ret = upbit.buy_limit_order(TICKER_KRW_BTC, float(pyupbit.get_current_price(TICKER_KRW_BTC)), float(upbit.get_balance(TICKER_KRW)*0.1))
         if 'error' in ret.keys():
@@ -91,7 +93,8 @@ def buy_btc(upbit):
     return True
 
 def buy_eth(upbit):
-    print ("{0}|잔고:{1}".format("KRW", upbit.get_balance(TICKER_KRW)))
+    #TODO:세부 내용 변경 필요 구조만 잡아놓음
+    print ("{0}|잔고:{1}|주문 수량:{2}".format("KRW", upbit.get_balance(TICKER_KRW), upbit.get_balance(TICKER_KRW_BTC)/upbit.get_balance(TICKER_KRW)))
     if TEST == False:
         ret = upbit.buy_limit_order(TICKER_KRW_BTC, float(pyupbit.get_current_price(TICKER_KRW_BTC)), float(upbit.get_balance(TICKER_KRW)*0.1))
         if 'error' in ret.keys():
@@ -100,7 +103,8 @@ def buy_eth(upbit):
     return True
 
 def sell_eth(upbit):
-    print ("{0}|잔고:{1}".format("KRW", upbit.get_balance(TICKER_KRW)))
+    #TODO:세부 내용 변경 필요 구조만 잡아놓음
+    print ("매도|{0}|가격:{1}|수량:{2}".format("ETH", pyupbit.get_current_price(TICKER_KRW_ETH), upbit.get_balance(TICKER_KRW_ETH)))
     if TEST == False:
         ret = upbit.buy_limit_order(TICKER_KRW_BTC, float(pyupbit.get_current_price(TICKER_KRW_BTC)), float(upbit.get_balance(TICKER_KRW)*0.1))
         if 'error' in ret.keys():
