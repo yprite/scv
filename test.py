@@ -21,7 +21,7 @@ TICKER_KRW_ETH = "KRW-ETH"
 TICKER_KRW_BTC = "KRW-BTC"
 
 RATIO = 0.5
-init_balance = 2700000
+init_balance = 3000000
 
 
 def load_config():
