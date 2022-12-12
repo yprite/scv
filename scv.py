@@ -12,32 +12,8 @@ import numpy as np
 #     target_price = df.iloc[0]['close'] + (df.iloc[0]['high'] - df.iloc[0]['low']) * k
 #     print(target_price)
 #     return target_price
-    
-def get_targetPrice(df, K) :
-    range = df['high'][-2] - df['low'][-2]
-    return df['open'][-1] + range * K
-    
-def get_best_K(coin, fees) :
-    df = pyupbit.get_ohlcv(coin, interval = "day", count = 21)
-    max_crr = 0
-    best_K = 0.5
-    for k in np.arange(0.0, 1.0, 0.1) :
-        crr = get_crr(df, fees, k)
-        if crr > max_crr :
-            max_crr = crr
-            best_K = k
-    return best_K
 
-def upbit():
-    coin = "KRW-DOGE"
-    fees = 0.0005
-    
-    df = pyupbit.get_ohlcv(coin, count = 2, interval = "day")
-    targetPrice = get_targetPrice(df, get_best_K(coin, fees))
-    print ("목표매수가 : ", targetPrice)
-    currentPrice = pyupbit.get_current_price(coin)
-    if targetPrice <= currentPrice:
-        print ("매수 (targetPrice: ",  targetPrice, "현재가: ", currentPrice, ")")
+offlineMode=True
 
 def telegram_handler(event, context):
     # TELEGRAM 메시지 보내
@@ -73,12 +49,77 @@ def telegram_handler(event, context):
     # 연결 끊기
     connection.close()
 
+def get_crr(df, fees, K) :
+    df['range'] = df['high'].shift(1) - df['low'].shift(1)
+    df['targetPrice'] = df['open'] + df['range'] * K
+    df['drr'] = np.where(df['high'] > df['targetPrice'], (df['close'] / (1 + fees)) / (df['targetPrice'] * (1 + fees)) , 1)
+    return df['drr'].cumprod()[-2]
+    
+def get_targetPrice(df, K) :
+    range = df['high'][-2] - df['low'][-2]
+    return df['open'][-1] + range * K
+    
+def get_best_K(coin, fees) :
+    df = pyupbit.get_ohlcv(coin, interval = "day", count = 21)
+    max_crr = 0
+    best_K = 0.5
+    for k in np.arange(0.0, 1.0, 0.1) :
+        crr = get_crr(df, fees, k)
+        if crr > max_crr :
+            max_crr = crr
+            best_K = k
+    return best_K
+    
+def get_balance(coin):
+    if offlineMode == True:
+        f = open(coin + '.balance', 'r')
+        return int(str(f.readline()).strip())
+    else:
+        return upbit.get_balance(coin)
+
+def buy_all(coin) :
+    balance = get_balance("KRW") * 0.9995
+    if balance >= 5000 :
+        if offlineMode == True:
+            coin_f = open (coin + '.balance', w)
+            coin_balance = pyupbit.get_current_price(coin) / balance
+            coin_f.write(str(oin_balance))
+            balance = get_balance("KRW") - balance
+            krw_f = open('KRW.balance', w)
+            krw_f.write(str(balance))
+        else:
+            print(upbit.buy_market_order(coin, balance))
+        post_message("매수 체결.\n체결 단가 : "+str(pyupbit.get_current_price(coin))+" 원")
+
+def sell_all(coin) :
+    balance = get_balance(coin)
+    price = pyupbit.get_current_price(coin)
+    if price * balance >= 5000 :
+        if offlineMode == True:
+            coin_f = open (coin + '.balance', w)
+            coin_f.write("0")
+            krw_balance = pyupbit.get_current_price(coin) * balance
+            balance = get_balance("KRW") + krw_balance
+            krw_f = open('KRW.balance', w)
+            krw_f.write(str(balance))
+        else:
+            print(upbit.sell_market_order(coin, balance))
+        post_message("매도 체결.\n체결 단가 : "+str(pyupbit.get_current_price(coin))+" 원")
+        
+def upbit():
+    coin = "KRW-DOGE"
+    fees = 0.0005
+    
+    df = pyupbit.get_ohlcv(coin, count = 2, interval = "day")
+    targetPrice = get_targetPrice(df, get_best_K(coin, fees))
+    print ("목표매수가 : ", targetPrice)
+    currentPrice = pyupbit.get_current_price(coin)
+    print ("목표매수가: ",  targetPrice, "현재가: ", currentPrice)
+    if targetPrice <= currentPrice:
+        buy_all(coin)
+
 def lambda_handler(event, context):
     # TODO implement
-    
-    print("event : ", event)
-    print("context : ", context)
-    
     #telegram_handler(event, context)
     upbit()
     
