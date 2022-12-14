@@ -146,7 +146,7 @@ def upbit():
         print ("SELL 9시 now: " + now)
         sell_all(coin)
     # elif targetPrice <= currentPrice:
-    else 
+    else:
         print ("targetPrice: {}, currentPrice:{}".format(targetPrice, currentPrice))
         buy_all(coin)
 
