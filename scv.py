@@ -4,6 +4,9 @@ import os
 import pyupbit
 import numpy as np
 import datetime
+import boto3
+from botocore.exceptions import ClientError
+
 #https://techfox.tistory.com/59 pyupbit 라이브러리 추가
 # targetPrice = get_target_price("KRW-DOGE", 0.5)
 # def get_target_price(ticker, k):
@@ -17,6 +20,8 @@ import datetime
 
 offlineMode=True
 notiBackend="telegram"
+dynamodb = boto3.resource('dynamodb')
+table = dynamodb.Table('balance')
 
 def telegram_handler(text):
     # TELEGRAM 메시지 전송
@@ -61,6 +66,15 @@ def isTelegramRequest(event):
 def post_message(text):
     telegram_handler(text)
 
+def get_symbol(s):
+    symbolDict = {
+        "도지":"KRW-DOGE","DOGE":"KRW-DOGE",
+        "이더":"KRW-ETH", "이더리움":"KRW-ETH", 
+        "비코":"KRW-BTC", "비트코인":"KRW-BTC", "비트":"KRW-BTC"
+    }
+    if s in symbolDict:
+        return symbolDict[s]
+
 def get_crr(df, fees, K) :
     df['range'] = df['high'].shift(1) - df['low'].shift(1)
     df['targetPrice'] = df['open'] + df['range'] * K
@@ -81,51 +95,72 @@ def get_best_K(coin, fees) :
             max_crr = crr
             best_K = k
     return best_K
-    
+
 def get_balance(coin):
     if offlineMode == True:
         f = open(coin + '.balance', 'r')
         return int(str(f.readline()).strip())
     else:
         return upbit.get_balance(coin)
+    
+def get_balance_by_dynamodb(coin):
+    if offlineMode == True:
+        try:
+            response = table.get_item(Key={'PK':coin})
+            print ("type:{}, response : {}".format(type(response),response))
+            if 'Item' in response:
+                return float(response['Item']['BALANCE'])
+            else:
+                return -1
+        except Exception as e:
+            post_message("get balance error:{}".format(e))
+            return -1
+        
+def set_balance_by_dynamodb(coin, balance):
+    response = table.put_item(Item={'PK':coin,'BALANCE':str(balance)})
+    print ("type:{}, response : {}".format(type(response),response))
+    if 'ResponseMetadata' in response and response['ResponseMetadata']['HTTPStatusCode'] == 200:
+        return True
+    return False
 
 def buy_all(coin) :
     balance = get_balance("KRW") * 0.9995
     if balance >= 5000 :
         if offlineMode == True:
-            coin_f = open (coin + '.balance', w)
+            coin_f = open (coin + '.balance', 'w')
             coin_balance = pyupbit.get_current_price(coin) / balance
-            coin_f.write(str(oin_balance))
+            coin_f.write(str(coin_balance))
             balance = get_balance("KRW") - balance
-            krw_f = open('KRW.balance', w)
+            krw_f = open('KRW.balance', 'w')
             krw_f.write(str(balance))
         else:
             print(upbit.buy_market_order(coin, balance))
         post_message("매수 체결.\n체결 단가 : "+str(pyupbit.get_current_price(coin))+" 원")
+
+def buy_all_by_dynamodb(coin, krw_balance):
+    krw_order_balance = get_balance_by_dynamodb('KRW') * 0.9995
+    if krw_order_balance >= 5000:
+        set_balance_by_dynamodb(coin, krw_order_balance / pyupbit.get_current_price(get_symbol(coin)))
+        set_balance_by_dynamodb('KRW', get_balance_by_dynamodb('KRW') - krw_order_balance)
+        post_message ('{} balance : {}'.format('KRW', get_balance_by_dynamodb('KRW')))
+        post_message ('{} balance : {}'.format(coin, get_balance_by_dynamodb(coin)))
+
 
 def sell_all(coin) :
     balance = get_balance(coin)
     price = pyupbit.get_current_price(coin)
     if price * balance >= 5000 :
         if offlineMode == True:
-            coin_f = open (coin + '.balance', w)
+            coin_f = open (coin + '.balance', 'w')
             coin_f.write("0")
             krw_balance = pyupbit.get_current_price(coin) * balance
             balance = get_balance("KRW") + krw_balance
-            krw_f = open('KRW.balance', w)
+            krw_f = open('KRW.balance', 'w')
             krw_f.write(str(balance))
         else:
             print(upbit.sell_market_order(coin, balance))
         post_message("매도 체결.\n체결 단가 : "+str(pyupbit.get_current_price(coin))+" 원")
         
-def get_symbol(s):
-    symbolDict = {
-        "도지":"KRW-DOGE",
-        "이더":"KRW-ETH", "이더리움":"KRW-ETH", 
-        "비코":"KRW-BTC", "비트코인":"KRW-BTC", "비트":"KRW-BTC"
-    }
-    if s in symbolDict:
-        return symbolDict[s]
         
 def upbit():
     coin = "KRW-DOGE"
@@ -142,13 +177,23 @@ def upbit():
         
     post_message ("수익율: "+str(((sumKrwBalance/startBalance) -1)*100)+"%\n목표매수가: "+str(targetPrice)+"현재가: "+str(currentPrice)+"\n현재 잔고: "+str(get_balance("KRW")))
     now = datetime.datetime.now()
+    print ("start")
     if now.hour == 9:
         print ("SELL 9시 now: " + now)
-        sell_all(coin)
+        # sell_all(coin)
     # elif targetPrice <= currentPrice:
     else:
         print ("targetPrice: {}, currentPrice:{}".format(targetPrice, currentPrice))
-        buy_all(coin)
+        # buy_all(coin)
+    print ("end")
+
+def test_get_balance_by_dynamodb():
+    balance = get_balance_by_dynamodb("KRW")
+    if balance != -1:
+        post_message (balance)
+        
+def test_buy_all_by_dynamodb():
+    buy_all_by_dynamodb("DOGE", 1000000*0.9995)
 
 def parse_command(event):
     print (event)
@@ -172,8 +217,8 @@ def parse_command(event):
                     o += "\n"
             post_message(o)
         elif cmd == "테스트":
-            upbit()
-        
+            #test_get_balance_by_dynamodb()
+           test_buy_all_by_dynamodb()
     else:
         post_message("지원하지않음 ")
 
