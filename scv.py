@@ -171,6 +171,8 @@ def parse_command(event):
                 if idx < len(params):
                     o += "\n"
             post_message(o)
+        elif cmd == "테스트":
+            upbit()
         
     else:
         post_message("지원하지않음 ")
