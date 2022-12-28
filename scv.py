@@ -183,6 +183,29 @@ def dca_bitcoin():
         #실패
         ## 텔레그램으로 전송
         ## 향후 -> 나만의 사이트에서 dca 그래프 보여줌 - 웹으로
+        # ({
+        #     'uuid': '82e211da-21f6-4355-9d76-83e7248e2c0c',
+        #     'side': 'bid',
+        #     'ord_type': 'limit',
+        #     'price': '100.0',
+        #     'avg_price': '0.0',
+        #     'state': 'wait',
+        #     'market': 'KRW-XRP',
+        #     'created_at': '2021-02-13T05:39:40+09:00',
+        #     'volume': '20.0',
+        #     'remaining_volume': '20.0',
+        #     'reserved_fee': '2.0',
+        #     'remaining_fee': '2.0',
+        #     'paid_fee': '0.0',
+        #     'locked': '4002.0',
+        #     'executed_volume': '0.0',
+        #     'trades_count': 0
+        #     },
+        #     {
+        #     'group': 'order',
+        #     'min': 78,
+        #     'sec': 6
+        # })
         orderBalance = 1000000  * 0.9995
         result = upbit.buy_market_order(coin, orderBalance)
         post_message("비트코인 시장가 매수 결과:{}".format(str(result)))
