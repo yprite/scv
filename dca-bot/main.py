@@ -2,6 +2,8 @@ import http.client
 import json
 import pyupbit
 import configparser as parser
+import pandas as pd
+from collections import deque
 
 
 class DcaBot:
@@ -29,7 +31,6 @@ class DcaBot:
 
     def telegram_handler(self, text):
         # TELEGRAM 메시지 전송
-        # https://velog.io/@dragontiger/%ED%8C%8C%EC%9D%B4%EC%8D%ACAWS-LambdaAWS-API-Gateway-%ED%85%94%EB%A0%88%EA%B7%B8%EB%9E%A8-%EB%B4%87-%EA%B0%9C%EB%B0%9C-%EB%B0%B0%ED%8F%AC%EA%B9%8C%EC%A7%80
         TELEGRAM_API_HOST = 'api.telegram.org'
         TOKEN = self.telegram_token
         CHAT_ID = self.telegram_chat_id
@@ -73,9 +74,9 @@ class DcaBot:
         amount = self.upbit.get_amount(ticker=symbol)
         return amount
 
-    def buy_market_price(self):
+    def buy_market_price(self, amount):
         # Place a market order to buy Bitcoin
-        buy_result = self.upbit.buy_market_order(self.symbol, self.amount)
+        buy_result = self.upbit.buy_market_order(self.symbol, amount)
         if buy_result is None:
             # Print the result of the buy order
             self.post_message("Failed to placed buy order!") 
@@ -84,20 +85,49 @@ class DcaBot:
 
     def print_current_balance(self):
         self.post_message("보유 KRW : {}".format(self.get_balance('KRW')))      # 보유 KRW
-        self.post_message("총매수금액 : {}".format(self.get_amount('ALL')))     # 총매수금액
-        self.post_message("비트수량 : {}".format(self.get_balance('KRW-BTC'))) # 비트코인 보유수량
+        #self.post_message("총매수금액 : {}".format(self.get_amount('ALL')))     # 총매수금액
+        self.post_message("{} 수량 : {}".format(self.symbol, self.get_balance(self.symbol))) # 비트코인 보유수량
 
+    def get_current_price(self):
+        price = pyupbit.get_current_price(self.symbol)
+        return price
 
+    def decide_order_amount(self):
+        df = pyupbit.get_ohlcv(ticker=self.symbol, count=200)
+        sa = StatisticAnalyzer()
+        ma10 = sa.calcMa(df, 10)
+        ma20 = sa.calcMa(df, 20)
+        ma60 = sa.calcMa(df, 60)
+        ma120 = sa.calcMa(df, 120)
+        price = self.get_current_price()
+        if price <= ma120:
+            return self.amount * 4
+        elif price <= ma60:
+            return self.amount * 2
+        elif price <= ma20:
+            return self.amount * 1)
+        elif price <= ma10:
+            return self.amount * 0.5
 
     def run(self):
-        self.buy_market_price()
+        self.buy_market_price(self.decide_order_amount())
         self.print_current_balance()
+
+        
+class StatisticAnalyzer:
+    @staticmethod
+    def calcMa(df: pd.DataFrame, count: int) -> float:
+        dq = deque(maxlen=count)
+        dq.extend(df['close'])
+        ma = sum(dq) / len(dq)
+        return ma
+
 
 
 if __name__ == "__main__":
-    symbol = "KRW-BTC"
-    amount = 1000000
-    dcaBot = DcaBot(symbol, amount)
-    dcaBot.run()
+    btc_dca_bot = DcaBot('KRW-BTC', 50000)
+    btc_dca_bot.run()
+    eth_dca_bot = DcaBot('KRW-ETH', 20000)
+    eth_dca_bot.run()
 
 
