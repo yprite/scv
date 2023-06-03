@@ -105,7 +105,7 @@ class DcaBot:
         elif price <= ma60:
             return self.amount * 2
         elif price <= ma20:
-            return self.amount * 1)
+            return self.amount * 1
         elif price <= ma10:
             return self.amount * 0.5
 
