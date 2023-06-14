@@ -99,15 +99,21 @@ class DcaBot:
         ma20 = sa.calcMa(df, 20)
         ma60 = sa.calcMa(df, 60)
         ma120 = sa.calcMa(df, 120)
+        ma150 = sa.calcMa(df, 150)
+        ma180 = sa.calcMa(df, 180)
         price = self.get_current_price()
-        if price <= ma120:
+        if price <= ma180:
+            return self.amount * 5
+        elif price <= ma150:
             return self.amount * 4
+        elif price <= ma120:
+            return self.amount * 3
         elif price <= ma60:
             return self.amount * 2
         elif price <= ma20:
             return self.amount * 1
         elif price <= ma10:
-            return self.amount * 0.5
+            return round(self.amount * 0.5, -3)
 
     def run(self):
         self.buy_market_price(self.decide_order_amount())
