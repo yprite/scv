@@ -3,6 +3,7 @@ import json
 import pyupbit
 import configparser as parser
 import pandas as pd
+import requests
 from collections import deque
 
 
@@ -63,6 +64,23 @@ class DcaBot:
         # 연결 끊기
         connection.close()
 
+    def grafana_handler(self):
+        from datetime import datetime, timedelta
+        url = "http://43.201.132.26:8000/analysis/buy"
+        date = datetime.now() - timedelta(days=1)
+        payload = {
+            "date": date.strftime("%Y-%m-%d"),
+            "symbol": self.symbol,
+            "current_price": float(self.get_current_price()),
+            "average_cost": float(self.average_cost),
+            "quanity": float(self.quanity)
+            }
+        response = requests.post(url, json=payload)
+        if response.status_code == 200:
+            print("POST request successful!")
+            print("Response:")
+            print(response.json())
+
     def post_message(self, msg):
         self.telegram_handler(msg)
 
@@ -92,6 +110,13 @@ class DcaBot:
         price = pyupbit.get_current_price(self.symbol)
         return price
 
+    def get_current_balance(self):
+        my_balance = self.upbit.get_balances()
+        for row in my_balance:
+            if row['currency'] == self.symbol.split('-')[1]:
+                self.average_cost = row['avg_buy_price']
+                self.quanity = row['balance']
+
     def decide_order_amount(self):
         df = pyupbit.get_ohlcv(ticker=self.symbol, count=200)
         sa = StatisticAnalyzer()
@@ -101,6 +126,7 @@ class DcaBot:
         ma120 = sa.calcMa(df, 120)
         ma150 = sa.calcMa(df, 150)
         ma180 = sa.calcMa(df, 180)
+        #ma_result = f'ma10:{ma10}, ma20:{ma20}, ma60:{ma60}, ma120:{ma120}, ma150:{ma150}, ma180:{ma180}'
         price = self.get_current_price()
         if price <= ma180:
             return self.amount * 5
@@ -112,12 +138,14 @@ class DcaBot:
             return self.amount * 2
         elif price <= ma20:
             return self.amount * 1
-        elif price <= ma10:
+        else:
             return round(self.amount * 0.5, -3)
 
     def run(self):
         self.buy_market_price(self.decide_order_amount())
         self.print_current_balance()
+        self.get_current_balance()
+        self.grafana_handler()
 
         
 class StatisticAnalyzer:
@@ -131,9 +159,9 @@ class StatisticAnalyzer:
 
 
 if __name__ == "__main__":
-    btc_dca_bot = DcaBot('KRW-BTC', 50000)
+    btc_dca_bot = DcaBot('KRW-BTC', 60000)
     btc_dca_bot.run()
-    eth_dca_bot = DcaBot('KRW-ETH', 20000)
+    eth_dca_bot = DcaBot('KRW-ETH', 30000)
     eth_dca_bot.run()
 
 
