@@ -93,6 +93,8 @@ class DcaBot:
         return amount
 
     def buy_market_price(self, amount):
+        if amount == 0:
+            return
         # Place a market order to buy Bitcoin
         buy_result = self.upbit.buy_market_order(self.symbol, amount)
         if buy_result is None:
@@ -116,36 +118,65 @@ class DcaBot:
             if row['currency'] == self.symbol.split('-')[1]:
                 self.average_cost = row['avg_buy_price']
                 self.quanity = row['balance']
+                
+    def get_quanity(self):
+        my_balance = self.upbit.get_balances()
+        for row in my_balance:
+            if row['currency'] == self.symbol.split('-')[1]:
+                return row['balance']
 
     def decide_order_amount(self):
+        # Bitcoin case : if current bitcoin amount is over 0.5, stop to order
+        #if self.symbol == "KRW-BTC" and float(self.get_quanity()) >= 0.5:
+        #    return 0
+        
+        # Ethereum case : if current ethereum amount is over 9, stop to order
+        if self.symbol == "KRW-ETH" and float(self.get_quanity()) >= 9:
+            return 0
+
         df = pyupbit.get_ohlcv(ticker=self.symbol, count=200)
         sa = StatisticAnalyzer()
+        if float(sa.calc_daily_change_rate(df, 2)) > 3.0:
+            self.post_message("rise") 
+            return 0
+
         ma10 = sa.calcMa(df, 10)
         ma20 = sa.calcMa(df, 20)
         ma60 = sa.calcMa(df, 60)
         ma120 = sa.calcMa(df, 120)
         ma150 = sa.calcMa(df, 150)
         ma180 = sa.calcMa(df, 180)
-        #ma_result = f'ma10:{ma10}, ma20:{ma20}, ma60:{ma60}, ma120:{ma120}, ma150:{ma150}, ma180:{ma180}'
+        ma_result = f'ma20:{ma20}, ma60:{ma60}, ma120:{ma120}, ma150:{ma150}, ma180:{ma180}'
         price = self.get_current_price()
+        self.post_message(ma_result)
+        self.post_message(price)
         if price <= ma180:
-            return self.amount * 5
-        elif price <= ma150:
+            self.post_message("under 180") 
             return self.amount * 4
-        elif price <= ma120:
+        elif price <= ma150:
+            self.post_message("under 150") 
             return self.amount * 3
-        elif price <= ma60:
+        elif price <= ma120:
+            self.post_message("under 120") 
             return self.amount * 2
-        elif price <= ma20:
+        elif price <= ma60:
+            self.post_message("under 60") 
             return self.amount * 1
+        elif price <= ma20:
+            self.post_message("under 20") 
+            #return self.amount * 1
+            return 0
         else:
-            return round(self.amount * 0.5, -3)
+            self.post_message("over 180") 
+            return 0 
+            #return round(self.amount * 0.5, -3)
 
     def run(self):
-        self.buy_market_price(self.decide_order_amount())
+        self.buy_market_price(self.amount*0.9995)
+        #self.buy_market_price(self.decide_order_amount())
         self.print_current_balance()
         self.get_current_balance()
-        self.grafana_handler()
+        #self.grafana_handler()
 
         
 class StatisticAnalyzer:
@@ -156,12 +187,25 @@ class StatisticAnalyzer:
         ma = sum(dq) / len(dq)
         return ma
 
+    @staticmethod
+    def calc_daily_change_rate(df: pd.DataFrame, count: int) -> float:
+        dq = deque(maxlen=count)
+        dq.extend(df['close'])
+        if len(dq) < 2:
+            return None  # Not enough data to calculate change rate
+        
+        start_price = dq[0]
+        end_price = dq[-1]
+        change_rate = ((end_price - start_price) / start_price) * 100.0  # Calculate change rate as a percentage
+
+        return change_rate
+
 
 
 if __name__ == "__main__":
-    btc_dca_bot = DcaBot('KRW-BTC', 60000)
+    btc_dca_bot = DcaBot('KRW-BTC', 1000000)
     btc_dca_bot.run()
-    eth_dca_bot = DcaBot('KRW-ETH', 30000)
-    eth_dca_bot.run()
+    #eth_dca_bot = DcaBot('KRW-ETH', 60000)
+    #eth_dca_bot.run()
 
 
